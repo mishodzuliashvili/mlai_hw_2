@@ -40,10 +40,7 @@ def crawl(directory):
 
     # Only include links to other pages in the corpus
     for filename in pages:
-        pages[filename] = set(
-            link for link in pages[filename]
-            if link in pages
-        )
+        pages[filename] = set(link for link in pages[filename] if link in pages)
 
     return pages
 
@@ -57,7 +54,20 @@ def transition_model(corpus, page, damping_factor):
     linked to by `page`. With probability `1 - damping_factor`, choose
     a link at random chosen from all pages in the corpus.
     """
-    raise NotImplementedError
+    probability_distribution = {}
+    links = corpus[page]
+    num_links = len(links)
+
+    if num_links == 0:
+        for p in corpus:
+            probability_distribution[p] = 1 / len(corpus)
+    else:
+        for p in corpus:
+            probability_distribution[p] = (1 - damping_factor) / len(corpus)
+            if p in links:
+                probability_distribution[p] += damping_factor / num_links
+
+    return probability_distribution
 
 
 def sample_pagerank(corpus, damping_factor, n):
@@ -69,7 +79,18 @@ def sample_pagerank(corpus, damping_factor, n):
     their estimated PageRank value (a value between 0 and 1). All
     PageRank values should sum to 1.
     """
-    raise NotImplementedError
+    page = random.choice(list(corpus.keys()))
+    pagerank = {p: 0 for p in corpus}
+
+    for _ in range(n):
+        pagerank[page] += 1
+        model = transition_model(corpus, page, damping_factor)
+        page = random.choices(list(model.keys()), weights=model.values())[0]
+
+    for p in pagerank:
+        pagerank[p] /= n
+
+    return pagerank
 
 
 def iterate_pagerank(corpus, damping_factor):
@@ -81,7 +102,30 @@ def iterate_pagerank(corpus, damping_factor):
     their estimated PageRank value (a value between 0 and 1). All
     PageRank values should sum to 1.
     """
-    raise NotImplementedError
+    num_pages = len(corpus)
+    tolerance = 0.001
+    pagerank = {p: 1 / num_pages for p in corpus}
+
+    while True:
+        new_pagerank = {}
+        for page in corpus:
+            total = sum(
+                pagerank[p] / len(corpus[p])
+                if len(corpus[p]) > 0
+                else pagerank[p] / num_pages
+                for p in corpus
+                if page in corpus[p] or len(corpus[p]) == 0
+            )
+            new_pagerank[page] = (
+                1 - damping_factor
+            ) / num_pages + damping_factor * total
+
+        if all(abs(new_pagerank[p] - pagerank[p]) < tolerance for p in pagerank):
+            break
+
+        pagerank = new_pagerank
+
+    return pagerank
 
 
 if __name__ == "__main__":
